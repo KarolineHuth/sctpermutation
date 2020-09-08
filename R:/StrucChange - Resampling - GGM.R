@@ -28,7 +28,7 @@ bootstrapData <- function(coef, obs, par){
 
 permutationData <- function(origdata){
   n <- nrow(origdata)
-  index <- sample(1:n, n, replace = TRUE)
+  index <- sample(1:n, n, replace = FALSE)
   newdata <- origdata
   newdata[, 2] <- origdata[index, 2] 
   return(newdata)
@@ -51,11 +51,11 @@ strucchangeGGM <- function(process, splitvar, model = "all"){
   
   process <- t(J12 %*% t(process))  
   
-  if(model == "correlation"){
-    ## select parameters to test
-    process <- process[, 11:20]
-    k <- NCOL(process)
-  }
+  # if(model == "correlation"){
+  #   ## select parameters to test
+  #   process <- process[, 11:20]
+  #   k <- NCOL(process)
+  # }
   
   ## Order along splitting variable
   zi <- as.matrix(splitvar)
@@ -104,7 +104,7 @@ bootPval <- function(i, p, n, deltacor = 0, bootiter){
   nodevars <- as.data.frame(origdata[, 3:(p+2)])
   splitvar <- as.data.frame(origdata[, 2])
   
-  fit <- mvnfit(nodevars, estfun = TRUE)
+  fit <- networktree::mvnfit(nodevars, estfun = TRUE)
   orig_stat <- strucchangeGGM(process = fit$estfun, splitvar)
   
   # Bootstrap from that original dataset
@@ -117,17 +117,21 @@ bootPval <- function(i, p, n, deltacor = 0, bootiter){
       bootnodevars <- as.data.frame(bootdata[, 2:(p+1)])
       bootsplitvar <- as.data.frame(bootdata[, 1])
       
-      bootfit <- mvnfit(bootnodevars, estfun = TRUE)
+      bootfit <- networktree::mvnfit(bootnodevars, estfun = TRUE)
       
       out <- try(strucchangeGGM(bootfit$estfun, bootsplitvar), silent = TRUE)
       if(!inherits(out, "try-error")) run <- TRUE
     }
     out_stat[i] <- out
   }
-  out_stat <- out_stat[order(out_stat)]
-  closestValue <- which.min(abs(out_stat - orig_stat))
   
-  pval <- (1- closestValue/bootiter)
+  #Karoline's old approach
+  # out_stat <- out_stat[order(out_stat)]
+  # closestValue <- which.min(abs(out_stat - orig_stat))
+  # pval.k <- (1 - closestValue/bootiter)
+  
+  # Maarten's genius short version:
+  pval <- mean(out_stat > orig_stat)
   
   res <- list(p = p, n = n, cor = deltacor, pval = pval)
   
@@ -149,7 +153,7 @@ permutationPval <- function(i, p, n, deltacor = 0, bootiter){
                            GGMSimulationSplit(p = p, n = n, prob = .2, 
                                               delta_interaction = deltacor))
     nodevars <- as.data.frame(origdata[, 3:(p+2)])
-    process <- mvnfit(nodevars, estfun = TRUE)$estfun
+    process <- networktree::mvnfit(nodevars, estfun = TRUE)$estfun
     
     splitvar <- as.data.frame(origdata[, 2])
     
@@ -171,10 +175,13 @@ permutationPval <- function(i, p, n, deltacor = 0, bootiter){
     out_stat[i] <- out
   }
   
-  out_stat <- out_stat[order(out_stat)]
-  closestValue <- which.min(abs(out_stat - orig_stat))
+  #Karoline's old approach
+  # out_stat <- out_stat[order(out_stat)]
+  # closestValue <- which.min(abs(out_stat - orig_stat))
+  # pval.k <- (1 - closestValue/bootiter)
   
-  pval <- (1 - closestValue/bootiter)
+  # Maarten's genius short version:
+  pval <- mean(out_stat > orig_stat)
   
   res <- list(p = p, n = n, cor = deltacor, pval = pval)
   

@@ -6,6 +6,9 @@ library("strucchange")
 library("parallel")
 library("tidyverse")
 
+### TO DO'S:
+# change reading in txt-file to reading in using string 
+
 # -------------------------------------------
 
 strucChangeGGM <- function(i, p, n, deltacor = 0){ 

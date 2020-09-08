@@ -7,6 +7,9 @@ library("modelr")
 library("tidyverse")
 library("parallel")
 
+### TO DO'S:
+# adapt to also allow for other test statistics but maxLM, e.g., CvM and DM
+
 # ----------------------------------------------------------------------
 # Bootstrap Function
 bootstrapData <- function(origdata){
@@ -18,7 +21,7 @@ bootstrapData <- function(origdata){
 
 permutationData <- function(origdata){
   n <- nrow(origdata)
-  index <- sample(1:n, n, replace = TRUE)
+  index <- sample(1:n, n, replace = FALSE)
   newdata <- origdata
   newdata[, 2] <- origdata[index, 2] 
   return(newdata)
@@ -37,8 +40,8 @@ bootPval <- function(i, p, n, deltacor = 0, bootiter){
   # Obtain original test statistic for Structural change test 
   form <- paste("y1", "~", paste(colnames(nodevars[,2:p]), collapse=" + "))
   form <- as.formula(form)
-  resorig <- gefp(form, fit = lm, scores = estfun, data = nodevars, order.by = origdata[, 2])
-  orig_stat <- sctest(resorig, functional = supLM())$statistic
+  resorig <- lm(form, data = nodevars)
+  orig_stat <- strucchange::sctest(resorig, functional = "maxLM", order.by = origdata[, 2], vcov = "info")$statistic
   
   # Bootstrap from that original dataset
   out_stat <- numeric(bootiter)
@@ -51,8 +54,8 @@ bootPval <- function(i, p, n, deltacor = 0, bootiter){
       
       form <- paste("y1", "~", paste(colnames(bootnodevars[,2:p]), collapse=" + "))
       form <- as.formula(form)
-      resboot <- gefp(form, fit = lm, scores = estfun, data = bootnodevars, order.by = bootdata[, 2])
-      out <- try(sctest(resboot, functional = supLM()), silent = TRUE)
+      resboot <- lm(form, data = bootnodevars)
+      out <- try(sctest(resboot, functional = "maxLM", order.by = bootdata[, 2], vcov = "info"), silent = TRUE)
       if(!inherits(out, "try-error")) run <- TRUE
     }
     out_stat[i] <- out$statistic
@@ -84,8 +87,9 @@ permutationPval <- function(i, p, n, deltacor = 0, bootiter){
   # Obtain original test statistic for Structural change test 
   form <- paste("y1", "~", paste(colnames(nodevars[,2:p]), collapse=" + "))
   form <- as.formula(form)
-  resorig <- gefp(form, fit = lm, scores = estfun, data = nodevars, order.by = origdata[, 2])
-  orig_stat <- sctest(resorig, functional = supLM())$statistic
+  resorig <- lm(form, data = nodevars)
+  orig_stat <- strucchange::sctest(resorig, functional = "maxLM", order.by = origdata[, 2], 
+                                   vcov = "info")$statistic
   
   # Resample from that original dataset
   out_stat <- numeric(bootiter)
@@ -96,19 +100,20 @@ permutationPval <- function(i, p, n, deltacor = 0, bootiter){
       permdata <- permutationData(origdata)
       permnodevars <- as.data.frame(permdata[, 3:(p+2)])
       
-      form <- paste("y1", "~", paste(colnames(permnodevars[,2:p]), collapse=" + "))
-      form <- as.formula(form)
-      resperm <- gefp(form, fit = lm, scores = estfun, data = permnodevars, order.by = permdata[, 2])
-      out <- try(sctest(resperm, functional = supLM()), silent = TRUE)
+      resperm <- lm(form, data = permnodevars)
+      out <- try(strucchange::sctest(resperm, functional = "maxLM", order.by = permdata[, 2], vcov = "info"), silent = TRUE)
       if(!inherits(out, "try-error")) run <- TRUE
     }
     out_stat[i] <- out$statistic
   }
   
-  out_stat <- out_stat[order(out_stat)]
-  closestValue <- which.min(abs(out_stat - orig_stat))
+  #Karoline's old approach
+  # out_stat <- out_stat[order(out_stat)]
+  # closestValue <- which.min(abs(out_stat - orig_stat))
+  # pval.k <- (1 - closestValue/bootiter)
   
-  pval <- (1 - closestValue/bootiter)
+  # Maarten's genius short version:
+  pval <- mean(out_stat > orig_stat)
   
   res <- list(p = p, n = n, cor = deltacor, pval = pval)
   
