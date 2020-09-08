@@ -11,23 +11,25 @@ library("tidyverse")
 strucChangeGGM <- function(i, p, n, deltacor = 0){ 
   n.nodes <- p
   n.obs <- n
+  minsplit <- p*(p-1)/2
+  if(minsplit > n/2) {minsplit <- (n/2 -10)} # change minsplit size in case it is smaller than the number of parameters
   run <- FALSE
   while(run == FALSE) {
-    data <- as.data.frame(GGMSimulationSplit(p = n.nodes, n = n.obs, prob = 0.2, 
-                                             delta_interaction = deltacor))
+    data <- GGMSimulationSplit(p = n.nodes, n = n.obs, prob = 0.2, 
+                                             delta_interaction = deltacor)
     nodevars <- as.data.frame(data[, 2:(p+1)])
     splitvar <- data[, 1]
     splitvars <- as.data.frame(splitvar)
     
-    out <- try(networktree(nodevars, splitvars, method = c("mob"), model = "correlation", 
-                    verbose = TRUE, minsplit = (n-50)/2))
+    out <- try(networktree::networktree(nodevars, splitvars, method = c("mob"), model = "correlation", 
+                    verbose = TRUE, minsplit = minsplit))
     if(!inherits(out, "try-error")) run <- TRUE
   }
   
   # Structural change test 
-  capture.output(networktree(nodevars, splitvars, method = c("mob"), model = "correlation", 
-                             verbose = TRUE, minsplit = (n-50)/2), file = paste0("outputfiles/out", i, ".txt"))
-  out <- readr::read_delim(paste0("outputfiles/out", i, ".txt"), delim = "-") 
+  capture.output(networktree::networktree(nodevars, splitvars, method = c("mob"), model = "correlation", 
+                             verbose = TRUE, minsplit = minsplit), file = paste0("out", i, ".txt"))
+  out <- readr::read_delim(paste0("out", i, ".txt"), delim = "-")
   
   # Very complicated but necessary way to get data out
   out <- strsplit(as.character(out$X1), ' ')
@@ -52,7 +54,7 @@ strucChangeGGM <- function(i, p, n, deltacor = 0){
   return(res)
 }
 
-#strucChangeGGM(1, p = 15, deltacor = .2, n = 200)
+#strucChangeGGM(1, p = 15, deltacor = 0, n = 200)
 
 n <- c(200, 500, 2000)
 p <- c(5, 10, 15)

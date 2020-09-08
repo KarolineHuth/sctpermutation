@@ -16,22 +16,15 @@ strucChangeReg <- function(i, p, n, deltacor = 0){
     form <- paste("y1", "~", paste(colnames(nodevars[,2:p]), collapse=" + "))
     form <- as.formula(form)
     
-    #res <- gefp(form, fit = lm, scores = estfun, data = nodevars, order.by = as.factor(data[, 1]))
     res <- lm(form, data = nodevars)
-    ## FOR ORDINAL AND BINARY SV
-    out_DM <- try(sctest(res, functional = "DM", order.by = data[, 1], vcov = "info"), 
+    out_DM <- try(strucchange::sctest(res, functional = "DM", order.by = data[, 1], vcov = "info"), 
                   silent = TRUE)
     if(!inherits(out_DM, "try-error")) run <- TRUE
   }
-  # out_DM <- sctest(res, functional = "DM", order.by = as.factor(data[, 1])
-  # out_CvM <- sctest(res, functional = "CvM", order.by = as.factor(data[, 1]), vcov = "info")
-  # out_maxLM <- sctest(res, functional = "maxLM", order.by = as.factor(data[, 1]), vcov = "info")
-  # out_LMuo <- sctest(res, functional = "LMuo", order.by = as.factor(data[, 1]), vcov = "info")
-  ## FOR CONTINUOUS SV
-  #out_DM <- sctest(res, functional = "DM", order.by = data[, 1], vcov = "info")
-  out_CvM <- sctest(res, functional = "CvM", order.by = data[, 1], vcov = "info")
-  out_maxLM <- sctest(res, functional = "maxLM", order.by = data[, 1], vcov = "info")
-  out_LMuo <- sctest(res, functional = "LMuo", order.by = data[, 1], vcov = "info")
+  # Check for other test statistics
+  out_CvM <- strucchange::sctest(res, functional = "CvM", order.by = data[, 1], vcov = "info")
+  out_maxLM <- strucchange::sctest(res, functional = "maxLM", order.by = data[, 1], vcov = "info")
+  out_LMuo <- strucchange::sctest(res, functional = "LMuo", order.by = data[, 1], vcov = "info")
   
   res <- list(p = p, n = n, cor = deltacor, 
               DMpval = out_DM$p.value, DMstat = out_DM$statistic, 
@@ -43,7 +36,7 @@ strucChangeReg <- function(i, p, n, deltacor = 0){
 
 #strucChangeReg(1, 5, 100)
 
-n <- c(50, 200, 1000) #c(2000, 4000) 
+n <- c(50, 200, 1000) 
 p <- c(3, 5, 9)
 cor <- c(0, 0.05, 0.1, 0.2)
 repiter <- 5000

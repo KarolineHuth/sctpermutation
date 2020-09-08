@@ -9,14 +9,14 @@ GGMSimulationSplit <- function(p, n, prob, delta_interaction){
   while(posdef == FALSE) {
     # Step A:
     # generate random network with x nodes, simulate pcor
-    graph <- ggm.simulate.pcor(p, etaA=prob)
+    graph <- GeneNet::ggm.simulate.pcor(p, etaA=prob)
     diag(graph) <- 1
     
     if (delta_interaction == 0) {
       
       # Simulate only one big dataset in case of no correlation difference
-      pcor.inv <- pseudoinverse(graph)
-      mean <- numeric(p)
+      pcor.inv <- corpcor::pseudoinverse(graph)
+      mean <- rep(0, p)
       
       d <- mvtnorm::rmvnorm(n, mean = mean, sigma = pcor.inv)
       posdef <- TRUE
@@ -33,15 +33,15 @@ GGMSimulationSplit <- function(p, n, prob, delta_interaction){
       graph2 <- graph + graph2
       
       
-      if (!is.positive.definite(graph2, tol=1e-8)){
+      if (!corpcor::is.positive.definite(graph2, tol=1e-8)){
         posdef <- FALSE
       } else {
         posdef <- TRUE
       }
       
-      pcor.inv <- pseudoinverse(graph)
-      pcor.inv2 <- pseudoinverse(graph2)
-      mean <- numeric(p)
+      pcor.inv <- corpcor::pseudoinverse(graph)
+      pcor.inv2 <- corpcor::pseudoinverse(graph2)
+      mean <- rep(0, p)
       
       # Sample Data 
       d <- rbind(
