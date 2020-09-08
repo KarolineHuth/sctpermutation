@@ -1,4 +1,4 @@
-rm(list = ls())
+# rm(list = ls())
 library("readr")
 library("networktree")
 library("MASS")
@@ -6,15 +6,25 @@ library("strucchange")
 library("modelr")
 library("tidyverse")
 library("parallel")
+source("~/Documents/PhD/03_Programming/MOBSimulation/R/DataSimulation.R")
 
 # ----------------------------------------------------------------------
 # Bootstrap Function
-bootstrapData <- function(origdata){
-  n <- nrow(origdata)
-  index <- sample(1:n, n, replace = TRUE)
-  newdata <- origdata[index, ]
+bootstrapData <- function(coef, obs, par){
+  
+  mean <- coef[1:par] 
+  sigma <- matrix(0, ncol = par, nrow = par)
+  diag(sigma) <- coef[(par+1) : (par+par)] 
+  sigma[lower.tri(sigma)] <- coef[(2*par+1):length(coef)] 
+  sigma[upper.tri(sigma)] <- t(sigma)[upper.tri(sigma)] 
+  data <- rmvnorm(n, mean, sigma,
+                     method=c("chol"), pre0.9_9994 = FALSE, checkSymmetry = TRUE)
+  z1 <- sort(sample(18:75, size = n, replace = TRUE)) 
+  newdata <- cbind(as.data.frame(z1), data)
   return(newdata)
 }
+
+#bootstrapData(coef = coef, obs = 200, par = 5)
 
 permutationData <- function(origdata){
   n <- nrow(origdata)
@@ -28,16 +38,7 @@ permutationData <- function(origdata){
 # ----------------------------------------------------------------------
 # Structural Change Function
 
-strucchangeGGM <- function(nodevars, splitvar, model = "all", permutation = TRUE){
-  
-  # Obtain the scores 
-  if(permutation == FALSE){
-    # for bootstrap: re-estimate the model for every dataset
-    process <- mvnfit(nodevars, estfun = TRUE)$estfun
-  } else {
-    # For permutation test scores are the same, just ordering different
-    process <- nodevars
-  }
+strucchangeGGM <- function(process, splitvar, model = "all"){
   
   k <- NCOL(process)
   n <- NROW(process)
@@ -98,12 +99,13 @@ strucchangeGGM <- function(nodevars, splitvar, model = "all", permutation = TRUE
 bootPval <- function(i, p, n, deltacor = 0, bootiter){ 
   # Generate Original Dataset
   origdata <- data.frame(id = 1:n, 
-                         GGMSimulationSplit(p = p, n = n, prob = .2, 
+                          GGMSimulationSplit(p = p, n = n, prob = .2, 
                                             delta_interaction = deltacor))
   nodevars <- as.data.frame(origdata[, 3:(p+2)])
   splitvar <- as.data.frame(origdata[, 2])
   
-  orig_stat <- strucchangeGGM(nodevars, splitvar, permutation = FALSE)
+  fit <- mvnfit(nodevars, estfun = TRUE)
+  orig_stat <- strucchangeGGM(process = fit$estfun, splitvar)
   
   # Bootstrap from that original dataset
   out_stat <- numeric(bootiter)
@@ -111,11 +113,13 @@ bootPval <- function(i, p, n, deltacor = 0, bootiter){
   for(i in 1:bootiter) {
     run <- FALSE
     while(run == FALSE){
-      bootdata <- bootstrapData(origdata)
-      bootnodevars <- as.data.frame(bootdata[, 3:(p+2)])
-      bootsplitvar <- as.data.frame(bootdata[, 2])
+      bootdata <- bootstrapData(coef = fit$coefficients, obs = n, par = p)
+      bootnodevars <- as.data.frame(bootdata[, 2:(p+1)])
+      bootsplitvar <- as.data.frame(bootdata[, 1])
       
-      out <- try(strucchangeGGM(bootnodevars, bootsplitvar, permutation = FALSE), silent = TRUE)
+      bootfit <- mvnfit(bootnodevars, estfun = TRUE)
+      
+      out <- try(strucchangeGGM(bootfit$estfun, bootsplitvar), silent = TRUE)
       if(!inherits(out, "try-error")) run <- TRUE
     }
     out_stat[i] <- out
@@ -130,7 +134,7 @@ bootPval <- function(i, p, n, deltacor = 0, bootiter){
   return(res)
 }
 
-#bootPval(1, p = 5, n = 100, bootiter  = 100)
+#bootPval(1, p = 5, n = 100, bootiter  = 200)
 
 # ------------------------------------------------------------
 # Obtain p-value trough permutation
@@ -149,7 +153,7 @@ permutationPval <- function(i, p, n, deltacor = 0, bootiter){
     
     splitvar <- as.data.frame(origdata[, 2])
     
-    orig_stat <- try(strucchangeGGM(nodevars = process, splitvar, permutation = TRUE), silent = TRUE)
+    orig_stat <- try(strucchangeGGM(process, splitvar), silent = TRUE)
     if(!inherits(orig_stat, "try-error")) estim <- TRUE
   }
   # Resample from that original dataset
@@ -161,7 +165,7 @@ permutationPval <- function(i, p, n, deltacor = 0, bootiter){
       permdata <- permutationData(origdata)
       permsplitvar <- as.data.frame(permdata[, 2])
       
-      out <- try(strucchangeGGM(nodevars = process, splitvar = permsplitvar, permutation = TRUE), silent = TRUE)
+      out <- try(strucchangeGGM(process, splitvar = permsplitvar), silent = TRUE)
       if(!inherits(out, "try-error")) run <- TRUE
     }
     out_stat[i] <- out
@@ -177,7 +181,7 @@ permutationPval <- function(i, p, n, deltacor = 0, bootiter){
   return(res)
 }
 
-#permutationPval(1, p = 5, n = 250, bootiter  = 1000)
+#permutationPval(1, p = 5, n = 250, bootiter  = 100)
 
 #----------------------------------------------------------------------
 # Simulations Regenerate the p-value using resampling
