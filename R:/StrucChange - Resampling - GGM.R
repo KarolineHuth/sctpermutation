@@ -6,26 +6,10 @@ library("strucchange")
 library("modelr")
 library("tidyverse")
 library("parallel")
-source("~/Documents/PhD/03_Programming/MOBSimulation/R/DataSimulation.R")
 
 # ----------------------------------------------------------------------
-# Bootstrap Function
-bootstrapData <- function(coef, obs, par){
-  
-  mean <- coef[1:par] 
-  sigma <- matrix(0, ncol = par, nrow = par)
-  diag(sigma) <- coef[(par+1) : (par+par)] 
-  sigma[lower.tri(sigma)] <- coef[(2*par+1):length(coef)] 
-  sigma[upper.tri(sigma)] <- t(sigma)[upper.tri(sigma)] 
-  data <- rmvnorm(n, mean, sigma,
-                     method=c("chol"), pre0.9_9994 = FALSE, checkSymmetry = TRUE)
-  z1 <- sort(sample(18:75, size = n, replace = TRUE)) 
-  newdata <- cbind(as.data.frame(z1), data)
-  return(newdata)
-}
 
-#bootstrapData(coef = coef, obs = 200, par = 5)
-
+# resampling the dataset 
 permutationData <- function(origdata){
   n <- nrow(origdata)
   index <- sample(1:n, n, replace = FALSE)
@@ -36,7 +20,7 @@ permutationData <- function(origdata){
 
 
 # ----------------------------------------------------------------------
-# Structural Change Function
+# Computing structural change test
 
 strucchangeGGM <- function(process, splitvar, model = "all"){
   
@@ -50,12 +34,6 @@ strucchangeGGM <- function(process, splitvar, model = "all"){
   J12 <- root.matrix(chol2inv(chol(meat)))
   
   process <- t(J12 %*% t(process))  
-  
-  # if(model == "correlation"){
-  #   ## select parameters to test
-  #   process <- process[, 11:20]
-  #   k <- NCOL(process)
-  # }
   
   ## Order along splitting variable
   zi <- as.matrix(splitvar)
@@ -87,63 +65,13 @@ strucchangeGGM <- function(process, splitvar, model = "all"){
 # splitvar <- as.data.frame(origdata[, 2])
 # splitvars <- as.data.frame(as.factor(origdata[, 2]))
 # 
-# 
 # strucchangeGGM(nodevars, splitvar, model = "correlation")
 
-# Check against networktree MOB
-#networktree(nodevars, splitvars, method = c("mob"), model = "correlation", verbose = TRUE)
-
-# ------------------------------------------------------------
-# Obtain p-value trough bootstrap
-
-bootPval <- function(i, p, n, deltacor = 0, bootiter){ 
-  # Generate Original Dataset
-  origdata <- data.frame(id = 1:n, 
-                          GGMSimulationSplit(p = p, n = n, prob = .2, 
-                                            delta_interaction = deltacor))
-  nodevars <- as.data.frame(origdata[, 3:(p+2)])
-  splitvar <- as.data.frame(origdata[, 2])
-  
-  fit <- networktree::mvnfit(nodevars, estfun = TRUE)
-  orig_stat <- strucchangeGGM(process = fit$estfun, splitvar)
-  
-  # Bootstrap from that original dataset
-  out_stat <- numeric(bootiter)
-  
-  for(i in 1:bootiter) {
-    run <- FALSE
-    while(run == FALSE){
-      bootdata <- bootstrapData(coef = fit$coefficients, obs = n, par = p)
-      bootnodevars <- as.data.frame(bootdata[, 2:(p+1)])
-      bootsplitvar <- as.data.frame(bootdata[, 1])
-      
-      bootfit <- networktree::mvnfit(bootnodevars, estfun = TRUE)
-      
-      out <- try(strucchangeGGM(bootfit$estfun, bootsplitvar), silent = TRUE)
-      if(!inherits(out, "try-error")) run <- TRUE
-    }
-    out_stat[i] <- out
-  }
-  
-  #Karoline's old approach
-  # out_stat <- out_stat[order(out_stat)]
-  # closestValue <- which.min(abs(out_stat - orig_stat))
-  # pval.k <- (1 - closestValue/bootiter)
-  
-  # Maarten's genius short version:
-  pval <- mean(out_stat > orig_stat)
-  
-  res <- list(p = p, n = n, cor = deltacor, pval = pval)
-  
-  return(res)
-}
-
-#bootPval(1, p = 5, n = 100, bootiter  = 200)
 
 # ------------------------------------------------------------
 # Obtain p-value trough permutation
 
-permutationPval <- function(i, p, n, deltacor = 0, bootiter){ 
+permutationPval <- function(i, p, n, deltacor = 0, permiter){ 
   
   estim <- FALSE
   while(estim == FALSE){
@@ -161,9 +89,9 @@ permutationPval <- function(i, p, n, deltacor = 0, bootiter){
     if(!inherits(orig_stat, "try-error")) estim <- TRUE
   }
   # Resample from that original dataset
-  out_stat <- numeric(bootiter)
+  out_stat <- numeric(permiter)
   
-  for(i in 1:bootiter) {
+  for(i in 1:permiter) {
     run <- FALSE
     while(run == FALSE){
       permdata <- permutationData(origdata)
@@ -175,12 +103,7 @@ permutationPval <- function(i, p, n, deltacor = 0, bootiter){
     out_stat[i] <- out
   }
   
-  #Karoline's old approach
-  # out_stat <- out_stat[order(out_stat)]
-  # closestValue <- which.min(abs(out_stat - orig_stat))
-  # pval.k <- (1 - closestValue/bootiter)
-  
-  # Maarten's genius short version:
+  # Determine p-value
   pval <- mean(out_stat > orig_stat)
   
   res <- list(p = p, n = n, cor = deltacor, pval = pval)
@@ -193,11 +116,11 @@ permutationPval <- function(i, p, n, deltacor = 0, bootiter){
 #----------------------------------------------------------------------
 # Simulations Regenerate the p-value using resampling
 
-n <- c(200, 500, 2000)
-p <- c(5, 10, 15)
-repiter <- 5000
-bootiter <- 1000 
-cor <- 0 #c(0, 0.05, 0.1, 0.2)
+n <- c(200, 500, 2000) # sample size
+p <- c(5, 10, 15) # size of network
+repiter <- 5000 # number of repetitions 
+permiter <- 1000 # number of samples for permutation approach
+cor <- 0 # measurement invariance violation (set to 0 to simulate data under the null - no measurement invariance violation)
 numCores <- detectCores()
 cntr <- 0
 res_GGMPerm <- list()
@@ -211,7 +134,7 @@ for (pi in 1:length(p)) {
       cit <- cor[ci]
       res_GGMPerm[[cntr]] <- mclapply(1:repiter, permutationPval, p = pit, n = nit,
                                    deltacor = cit,
-                                   bootiter = bootiter, mc.cores = numCores)
+                                   permiter = permiter, mc.cores = numCores)
     }
   }
 }

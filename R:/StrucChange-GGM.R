@@ -1,5 +1,3 @@
-rm(list = ls())
-
 library("networktree")
 library("MASS")
 library("strucchange")
@@ -10,6 +8,8 @@ library("tidyverse")
 # change reading in txt-file to reading in using string 
 
 # -------------------------------------------
+
+# Function to simulate data and compute structural change test for Gaussian Graphical model (GGM)
 
 strucChangeGGM <- function(i, p, n, deltacor = 0){ 
   n.nodes <- p
@@ -52,17 +52,24 @@ strucChangeGGM <- function(i, p, n, deltacor = 0){
   stat <- statistic[indexs]
   
   
-  res <- list(p = p, n = n, cor = deltacor, 
-              pval = pval, stat = stat)
+  res <- list(p = p, 
+              n = n, 
+              cor = deltacor, 
+              pval = pval, 
+              stat = stat)
   return(res)
 }
 
 #strucChangeGGM(1, p = 15, deltacor = 0, n = 200)
 
-n <- c(200, 500, 2000)
-p <- c(5, 10, 15)
-cor <- c(0, 0.05, 0.1, 0.2)
-repiter <- 5000
+# -------------------------------------------
+
+# Simulation of SCT under the Null-Hypothesis
+
+n <- c(200, 500, 2000) # sample sizes
+p <- c(5, 10, 15) # number of nodes in network
+cor <- 0 # measurement invariance violation (set to 0 to simulate data under the null - no measurement invariance violation)
+repiter <- 5000 # number of repetitions 
 numCores <- detectCores()
 res_GGM <- list()
 cntr <- 0
@@ -84,5 +91,5 @@ out <- unlist(res_GGM)
 res <- na.omit(as.numeric(out))
 resGGM <- as.data.frame(matrix(res, ncol = 5, byrow = T))
 colnames(resGGM) <- c("p", "n", "cor", "pval", "stat")
-trest <- resGGM %>% group_by(n, p, cor) %>% count()
+resGGM %>% group_by(n, p, cor) %>% count()
 write.csv(resGGM, "pval-StrucChange-GGM-cont.csv")

@@ -5,6 +5,8 @@ library("parallel")
 
 # -------------------------------------------
 
+# Function to simulate data and compute structural change test for linear regression model
+
 strucChangeReg <- function(i, p, n, deltacor = 0){ 
   
   run <- FALSE
@@ -21,25 +23,28 @@ strucChangeReg <- function(i, p, n, deltacor = 0){
                   silent = TRUE)
     if(!inherits(out_DM, "try-error")) run <- TRUE
   }
-  # Check for other test statistics
+  
+  # Check for all test statistics
   out_CvM <- strucchange::sctest(res, functional = "CvM", order.by = data[, 1], vcov = "info")
   out_maxLM <- strucchange::sctest(res, functional = "maxLM", order.by = data[, 1], vcov = "info")
-  out_LMuo <- strucchange::sctest(res, functional = "LMuo", order.by = data[, 1], vcov = "info")
   
   res <- list(p = p, n = n, cor = deltacor, 
               DMpval = out_DM$p.value, DMstat = out_DM$statistic, 
               CvMpval = out_CvM$p.value, CvMstat = out_CvM$statistic, 
-              maxLMpval = out_maxLM$p.value, maxLMstat = out_maxLM$statistic, 
-              LMuopval = out_LMuo$p.value, LMuostat = out_LMuo$statistic)
+              maxLMpval = out_maxLM$p.value, maxLMstat = out_maxLM$statistic)
   return(res)
 }
 
 #strucChangeReg(1, 5, 100)
 
-n <- c(50, 200, 1000) 
-p <- c(3, 5, 9)
-cor <- c(0, 0.05, 0.1, 0.2)
-repiter <- 5000
+# -------------------------------------------
+
+# Simulation of SCT under the Null-Hypothesis
+
+n <- c(50, 200, 1000) # sample size
+p <- c(3, 5, 9) # model size
+cor <- c(0) # invariance violation (set to 0 to simulate data under the null - no measurement invariance violation)
+repiter <- 5000 # number of repetitions 
 numCores <- detectCores()
 res_reg <- list()
 cntr <- 0
@@ -58,17 +63,11 @@ for (pi in 1:length(p)) {
 }
 
 out <- unlist(res_reg)
-
 res <- na.omit(as.numeric(out))
-
 resReg <- as.data.frame(matrix(res, ncol = 11, byrow = T))
-
 colnames(resReg) <- c("p", "n", "cor", "DMpval", "DMstat",
                       "CvMpval", "CvMstat", 
-                      "maxLMpval", "maxLMstat", 
-                      "LMuopval", "LMuostat"
-)
-head(resReg)
+                      "maxLMpval", "maxLMstat")
 resReg %>% group_by(n, p, cor) %>% count()
 write.csv(resReg, "pval-StrucChange-Reg-cont.csv")
 

@@ -7,7 +7,6 @@ GGMSimulationSplit <- function(p, n, prob, delta_interaction){
   posdef <- FALSE
   
   while(posdef == FALSE) {
-    # Step A:
     # generate random network with x nodes, simulate pcor
     graph <- GeneNet::ggm.simulate.pcor(p, etaA=prob)
     diag(graph) <- 1
@@ -57,8 +56,6 @@ GGMSimulationSplit <- function(p, n, prob, delta_interaction){
   # Generate a splitting variable/moderator variable
   z1 <- sort(sample(18:75, size = n, replace = TRUE)) # continuous splitting variable
   #z1 <- c(rep(0, n/2), rep(1, n/2)) # binary splitting variable
-
-  
   
   data <- cbind(as.data.frame(z1) , d)
   
