@@ -5,4 +5,4 @@ Equal parameter estimates across subgroups - measurement invariance - is a subst
 The functions contained in this repository allow for simulation of the structural change test in finite samples both for linear regression models and Gaussian graphical models. Furthermore, the repository also contains code to implement the permutation alternative.
 
 
-Pre-Print to the paper can be accessed here: https://psyarxiv.com/efzwq
+Pre-Print to the respective preprint can be accessed here: https://psyarxiv.com/efzwq
